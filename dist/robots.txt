@@ -1,3 +1,17 @@
 User-agent: *
 Allow: /
+
+# 검색엔진 크롤러 명시
+User-agent: Googlebot
+Allow: /
+
+User-agent: Yeti
+Allow: /
+
+User-agent: NaverBot
+Allow: /
+
+User-agent: bingbot
+Allow: /
+
 Sitemap: https://micro-break-routine.pomyjo.com/sitemap.xml
