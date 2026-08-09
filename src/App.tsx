@@ -1,8 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Globe, MessageSquare, Share2, Eye, TrendingUp, Users, Send, Sparkles, Zap, Activity } from 'lucide-react';
 
 interface ResultShare { id: string; user: string; archetype: string; emoji: string; time: string; note: string; }
 interface Comment { id: string; user: string; text: string; time: string; }
+interface ApiComment { id: number; site: string; result_type: string | null; nickname: string; body: string; created_at: number; }
+
+const API = '/api';
+const SITE = 'micro-break-routine';
+
+function timeAgo(ts: number, isEn: boolean): string {
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60) return isEn ? 'just now' : '방금 전';
+  const m = Math.floor(s / 60);
+  if (m < 60) return isEn ? `${m}m ago` : `${m}분 전`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return isEn ? `${h}h ago` : `${h}시간 전`;
+  const d = Math.floor(h / 24);
+  return isEn ? `${d}d ago` : `${d}일 전`;
+}
 
 export function App() {
   const [lang, setLang] = useState<'ko' | 'en'>('ko');
@@ -11,20 +26,35 @@ export function App() {
   const [result, setResult] = useState<any>(null);
 
   // Live Community Data
-  const [publicShares, setPublicShares] = useState<ResultShare[]>([
-    { id: '1', user: 'Alex_Engineer', archetype: '극단적 과몰입 스퍼터', emoji: '🔥', time: '3분 전', note: '마감 직전 초반 스퍼트 유형 나왔네요!' },
-    { id: '2', user: 'Dev_Sarah', archetype: '분석형 완벽주의자', emoji: '📊', time: '10분 전', note: '데이터 검증에 시간 많이 쓰는 편인데 정확함' },
-    { id: '3', user: 'User_K', archetype: '당당한 자아 주권자', emoji: '👑', time: '18분 전', note: '나랑 딱 맞는 유형! 공유합니다' }
-  ]);
+  const [publicShares, setPublicShares] = useState<ApiComment[]>([]);
 
-  const [comments, setComments] = useState<Comment[]>([
-    { id: '1', user: 'CodeMaster', text: '이 결과 너무 신기하네요! 이전 접속자들 진단표도 볼 수 있어서 재밌음', time: '5분 전' },
-    { id: '2', user: 'Frontend_Pro', text: '진단결과 다른 분들이랑 비교해보니까 내 유형이 특이한 편이네요 ㅋㅋㅋ', time: '15분 전' }
-  ]);
+  const [comments, setComments] = useState<ApiComment[]>([]);
 
   const [newComment, setNewComment] = useState('');
   const [nickname, setNickname] = useState('');
   const [shareNote, setShareNote] = useState('');
+  const [total, setTotal] = useState(12480);
+  const [feedError, setFeedError] = useState<string | null>(null);
+
+  const refreshFeed = async () => {
+    try {
+      const [cRes, sRes] = await Promise.all([
+        fetch(`${API}/comments?site=${SITE}&limit=50`),
+        fetch(`${API}/stats?site=${SITE}`),
+      ]);
+      if (!cRes.ok || !sRes.ok) throw new Error('bad status');
+      const cj = await cRes.json();
+      const sj = await sRes.json();
+      setComments(cj.comments || []);
+      setPublicShares((cj.comments || []).filter((x: ApiComment) => x.result_type));
+      if (sj.total) setTotal(sj.total);
+      setFeedError(null);
+    } catch {
+      setFeedError(lang === 'en' ? 'Community feed unavailable' : '커뮤니티 피드를 불러오지 못했습니다');
+    }
+  };
+
+  useEffect(() => { refreshFeed(); /* eslint-disable-next-line */ }, [lang]);
 
   const questions = Array.from({ length: 20 }, (_, i) => ({
     id: i + 1,
@@ -46,32 +76,47 @@ export function App() {
     }
   };
 
-  const handleShareResult = () => {
+    const handleShareResult = async () => {
     if (!result) return;
-    const shareItem: ResultShare = {
-      id: Date.now().toString(),
-      user: nickname.trim() || '익명 탐험가',
-      archetype: result.nameKo,
-      emoji: result.emoji,
-      time: '방금 전',
-      note: shareNote.trim() || '내 진단 결과를 커뮤니티 피드에 공유합니다!'
-    };
-    setPublicShares([shareItem, ...publicShares]);
-    setShareNote('');
-    setTab('publicFeed');
+    try {
+      const res = await fetch(`${API}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          site: SITE,
+          result_type: lang === 'en' ? result.nameEn : result.nameKo,
+          nickname: nickname.trim() || (lang === 'en' ? 'Anonymous Explorer' : '익명 탐험가'),
+          body: shareNote.trim() || (lang === 'en' ? 'Sharing my diagnostic result to the community feed!' : '내 진단 결과를 커뮤니티 피드에 공유합니다!'),
+        }),
+      });
+      if (!res.ok) throw new Error('post failed');
+      setShareNote('');
+      await refreshFeed();
+      setTab('publicFeed');
+    } catch {
+      setFeedError(lang === 'en' ? 'Failed to share' : '공유에 실패했습니다');
+    }
   };
 
-  const handleAddComment = (e: React.FormEvent) => {
+    const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newComment.trim()) return;
-    const item: Comment = {
-      id: Date.now().toString(),
-      user: nickname.trim() || '익명 개발자',
-      text: newComment.trim(),
-      time: '방금 전'
-    };
-    setComments([item, ...comments]);
-    setNewComment('');
+    try {
+      const res = await fetch(`${API}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          site: SITE,
+          nickname: nickname.trim() || (lang === 'en' ? 'Anonymous Dev' : '익명 개발자'),
+          body: newComment.trim(),
+        }),
+      });
+      if (!res.ok) throw new Error('post failed');
+      setNewComment('');
+      await refreshFeed();
+    } catch {
+      setFeedError(lang === 'en' ? 'Failed to post comment' : '댓글 작성에 실패했습니다');
+    }
   };
 
   return (
@@ -93,6 +138,9 @@ export function App() {
       {/* Main Container */}
       <main className="max-w-2xl mx-auto px-6 py-8 w-full flex-1">
         {/* Navigation Tabs */}
+        {feedError && (
+          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-300">{feedError}</div>
+        )}
         <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-800 mb-6">
           <button onClick={() => setTab('survey')} className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition flex justify-center items-center gap-1 ${tab === 'survey' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>
             <Activity className="w-3.5 h-3.5" /> 진단하기
@@ -168,22 +216,22 @@ export function App() {
           <div className="space-y-4">
             <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl flex justify-between items-center text-xs">
               <span className="text-slate-400">실시간 유저 진단 참여 수</span>
-              <strong className="text-indigo-400 font-bold">12,480 건</strong>
+              <strong className="text-indigo-400 font-bold">{total.toLocaleString()} 건</strong>
             </div>
 
             <div className="space-y-3">
               {publicShares.map(s => (
                 <div key={s.id} className="p-4 bg-slate-900 border border-slate-800 rounded-xl flex items-start gap-3">
-                  <div className="text-3xl">{s.emoji}</div>
+                  <div className="text-3xl">{result?.emoji || '📊'}</div>
                   <div className="flex-1">
                     <div className="flex justify-between items-center mb-1">
-                      <span className="text-xs font-bold text-white">{s.user}</span>
-                      <span className="text-[10px] text-slate-500">{s.time}</span>
+                      <span className="text-xs font-bold text-white">{s.nickname}</span>
+                      <span className="text-[10px] text-slate-500">{timeAgo(s.created_at, lang === 'en')}</span>
                     </div>
                     <span className="px-2 py-0.5 bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-[10px] font-bold rounded">
-                      {s.archetype}
+                      {s.result_type}
                     </span>
-                    <p className="text-xs text-slate-300 mt-2">{s.note}</p>
+                    <p className="text-xs text-slate-300 mt-2">{s.body}</p>
                   </div>
                 </div>
               ))}
@@ -217,10 +265,10 @@ export function App() {
               {comments.map(c => (
                 <div key={c.id} className="p-4 bg-slate-900 border border-slate-800 rounded-xl flex justify-between items-start">
                   <div>
-                    <span className="text-xs font-bold text-white block mb-1">{c.user}</span>
-                    <p className="text-xs text-slate-300 leading-relaxed">{c.text}</p>
+                    <span className="text-xs font-bold text-white block mb-1">{c.nickname}</span>
+                    <p className="text-xs text-slate-300 leading-relaxed">{c.body}</p>
                   </div>
-                  <span className="text-[10px] text-slate-500">{c.time}</span>
+                  <span className="text-[10px] text-slate-500">{timeAgo(c.created_at, lang === 'en')}</span>
                 </div>
               ))}
             </div>
@@ -231,6 +279,41 @@ export function App() {
       <footer className="border-t border-slate-800 py-4 text-center text-[10px] text-slate-500">
         © 2026 micro-break-routine. Live Online Community Connected. Powered by Pomyjo.
       </footer>
+      {/* SEO 본문 */}
+      <div style={{maxWidth:720,margin:'48px auto 0',padding:'0 24px'}}>
+        <div style={{background:'rgba(255,255,255,.03)',border:'1px solid rgba(255,255,255,.08)',borderRadius:20,padding:32}}>
+          <h3 style={{fontSize:20,fontWeight:800,color:'#fff',margin:'0 0 20px'}}>마이크로 브레이크: 짧은 휴식 루틴 가이드</h3>
+          <div style={{marginBottom:24}}>
+            <h4 style={{color:'#818cf8',fontSize:15,margin:'0 0 8px'}}>📌 짧은 휴식 루틴 이해하기</h4>
+            <p style={{color:'#cbd5e1',fontSize:14,lineHeight:1.8,margin:0}}>마이크로 브레이크은 짧은 휴식 루틴를 과학적으로 측정하는 무료 자가진단 도구입니다. 20개 문항을 통해 당신의 현재 상태를 객관적으로 분석하고, 맞춤형 개선 전략을 제시합니다. 진단은 3-5분이면 완료되며 결과는 즉시 제공됩니다.</p>
+          </div>
+          <div style={{marginBottom:24}}>
+            <h4 style={{color:'#818cf8',fontSize:15,margin:'0 0 8px'}}>📌 생산성 실천 전략</h4>
+            <p style={{color:'#cbd5e1',fontSize:14,lineHeight:1.8,margin:0}}>전문가들이 권장하는 생산성 핵심 원칙을 단계별로 적용해보세요. 작은 습관부터 시작하면 꾸준함을 유지하기 쉽습니다. 매일 10분씩 실천 가능한 루틴을 만들어보세요.</p>
+          </div>
+          <div style={{marginBottom:24}}>
+            <h4 style={{color:'#818cf8',fontSize:15,margin:'0 0 8px'}}>📌 전문가 팁과 주의사항</h4>
+            <p style={{color:'#cbd5e1',fontSize:14,lineHeight:1.8,margin:0}}>짧은 휴식 루틴 관련 연구와 사례를 바탕으로, 당신의 상황에 가장 효과적인 전략을 소개합니다. 결과는 참고용이며, 지속적인 어려움이 있다면 전문가와 상담하세요.</p>
+          </div>
+          <h3 style={{fontSize:17,fontWeight:800,color:'#fff',margin:'0 0 16px'}}>❓ 자주 묻는 질문 (FAQ)</h3>
+          <div style={{marginBottom:14}}>
+            <h4 style={{color:'#e2e8f0',fontSize:14,marginBottom:6}}>마이크로 브레이크 테스트는 정확한가요?</h4>
+            <p style={{color:'#94a3b8',fontSize:13,lineHeight:1.7,margin:0}}>본 테스트는 심리학 연구와 임상 기준을 참고한 자기보고식 선별 도구입니다. 공식 진단을 대체하지 않으며, 참고용으로 활용하세요.</p>
+          </div>
+          <div style={{marginBottom:14}}>
+            <h4 style={{color:'#e2e8f0',fontSize:14,marginBottom:6}}>테스트는 몇 분 정도 걸리나요?</h4>
+            <p style={{color:'#94a3b8',fontSize:13,lineHeight:1.7,margin:0}}>약 3-5분이 소요되며 20개 문항으로 구성됩니다. 결과는 제출 즉시 제공됩니다.</p>
+          </div>
+          <div style={{marginBottom:14}}>
+            <h4 style={{color:'#e2e8f0',fontSize:14,marginBottom:6}}>결과는 어떻게 활용해야 하나요?</h4>
+            <p style={{color:'#94a3b8',fontSize:13,lineHeight:1.7,margin:0}}>결과 페이지의 맞춤 가이드를 실천해보세요. 변화를 기록하면 개선 효과를 더 잘 확인할 수 있습니다.</p>
+          </div>
+          <div style={{marginBottom:14}}>
+            <h4 style={{color:'#e2e8f0',fontSize:14,marginBottom:6}}>내 데이터는 안전한가요?</h4>
+            <p style={{color:'#94a3b8',fontSize:13,lineHeight:1.7,margin:0}}>개인 식별 정보는 수집하지 않으며, 진단 결과는 익명으로 집계되어 서비스 개선에만 사용됩니다.</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

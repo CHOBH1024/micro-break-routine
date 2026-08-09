@@ -1,4 +1,3 @@
 User-agent: *
 Allow: /
-Sitemap: https://pomyjo.com/micro-break-routine/sitemap.xml
-Sitemap: https://pomyjo.com/micro-break-routine/rss.xml
+Sitemap: https://micro-break-routine.pomyjo.com/sitemap.xml
