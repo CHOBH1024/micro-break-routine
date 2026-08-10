@@ -26,6 +26,8 @@ export function App() {
   const [result, setResult] = useState<any>(null);
 
   // Live Community Data
+  // User answers for diagnostic (0‑5 scale)
+  const [answers, setAnswers] = useState<number[]>(Array(20).fill(0));
   const [publicShares, setPublicShares] = useState<ApiComment[]>([]);
 
   const [comments, setComments] = useState<ApiComment[]>([]);
@@ -62,17 +64,69 @@ export function App() {
     textEn: `Item ${i + 1}: Behavioral & diagnostic assessment.`
   }));
 
-  const handleAnswer = () => {
-    if (currentIdx + 1 < questions.length) {
-      setCurrentIdx(currentIdx + 1);
-    } else {
-      setResult({
+  const computeResult = (scores: number[]) => {
+    const total = scores.reduce((a, b) => a + b, 0);
+    // Simple tiered mapping (you can extend with more nuanced logic)
+    if (total >= 80) {
+      return {
         nameKo: "분석형 완벽주의자 (Analytical Perfectionist)",
         nameEn: "Analytical Perfectionist",
         emoji: "📊",
         descKo: "데이터와 정밀성을 추구하며 완벽한 결과를 위해 최선을 다하는 유형입니다.",
-        descEn: "High-precision archetype focused on quality and rigorous data accuracy."
-      });
+        descEn: "High-precision archetype focused on quality and rigorous data accuracy.",
+        insightsKo: "당신은 높은 자기 기준과 세밀한 분석을 선호합니다. 이는 업무 정확도에 강점이지만, 과도한 완벽주의가 스트레스를 초래할 수 있습니다.",
+        strategiesKo: [
+          "짧은 마이크로 브레이크를 5분마다 설정해 과도한 집중을 완화하세요.",
+          "‘80/20 법칙’을 적용해 가장 영향력 있는 작업에만 완벽을 추구하세요.",
+          "운동이나 스트레칭을 통한 신체 리셋을 일상에 포함하세요.",
+          "결과를 동료와 공유해 피드백을 받아 과도한 자기 판단을 완화하세요."
+        ]
+      };
+    } else if (total >= 60) {
+      return {
+        nameKo: "균형형 생산성 탐구자 (Balanced Productivity Explorer)",
+        nameEn: "Balanced Productivity Explorer",
+        emoji: "⚖️",
+        descKo: "효율과 휴식 사이의 균형을 추구하는 유형으로, 지속 가능한 업무 방식을 선호합니다.",
+        descEn: "Seeks a sustainable balance between focus and recovery.",
+        insightsKo: "당신은 업무와 휴식의 균형을 잘 맞추지만, 가끔 목표 설정이 모호해질 수 있습니다.",
+        strategiesKo: [
+          "포모도로 기법(25분 작업+5분 휴식)을 기본 루틴으로 도입하세요.",
+          "매일 가장 중요한 3가지 목표를 설정하고, 완료 후 마이크로 브레이크를 보상으로 활용하세요.",
+          "시각적 타이머와 부드러운 애니메이션으로 진행 상황을 가시화하세요.",
+          "동료와 주간 공유 세션을 열어 서로의 진단을 비교하고 아이디어를 교환하세요."
+        ]
+      };
+    } else {
+      return {
+        nameKo: "리프레시형 회복 탐색자 (Refresh-Focused Rest Seeker)",
+        nameEn: "Refresh-Focused Rest Seeker",
+        emoji: "💧",
+        descKo: "짧은 휴식과 재충전에 큰 가치를 두는 타입이며, 과도한 작업으로 인한 피로를 쉽게 느낍니다.",
+        descEn: "Values frequent micro-breaks and recovery, prone to fatigue from long work stretches.",
+        insightsKo: "당신은 작업 중 피로를 빨리 느끼며, 짧은 휴식이 필요합니다. 이는 장기 생산성 향상에 핵심 요소입니다.",
+        strategiesKo: [
+          "2‑3분 마이크로 브레이크를 20분 작업마다 반드시 실행하세요.",
+          "눈 깜빡이기와 목 스트레칭을 루틴에 포함해 신체 피로를 최소화하세요.",
+          "‘하이킹’ 혹은 ‘짧은 산책’ 같은 가벼운 활동으로 혈액 순환을 촉진하세요.",
+          "진단 결과를 SNS나 팀 채널에 공유해 서로 격려하는 문화를 만들세요."
+        ]
+      };
+    }
+  };
+
+  const handleAnswer = (score: number) => {
+    // record answer
+    setAnswers(prev => {
+      const next = [...prev];
+      next[currentIdx] = score;
+      return next;
+    });
+    if (currentIdx + 1 < questions.length) {
+      setCurrentIdx(currentIdx + 1);
+    } else {
+      const res = computeResult(answers);
+      setResult(res);
     }
   };
 
@@ -120,9 +174,9 @@ export function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700">
       {/* Header */}
-      <header className="border-b border-slate-800 bg-slate-900/80 px-6 py-4 flex justify-between items-center max-w-4xl mx-auto w-full sticky top-0 z-50">
+      <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur-lg px-6 py-4 flex justify-between items-center max-w-4xl mx-auto w-full sticky top-0 z-50">
         <div className="flex items-center gap-2">
           <Zap className="w-5 h-5 text-indigo-400" />
           <span className="font-extrabold text-base text-white tracking-tight uppercase">micro-break-routine</span>
@@ -168,7 +222,7 @@ export function App() {
                 <h2 className="text-lg font-bold text-white mb-6">{questions[currentIdx].textKo}</h2>
                 <div className="grid gap-2.5">
                   {[5, 4, 3, 2, 1].map((s, i) => (
-                    <button key={i} onClick={handleAnswer} className="p-3.5 bg-slate-950 border border-slate-800 hover:border-indigo-500 rounded-xl text-xs text-left text-slate-200 transition">
+                    <button key={i} onClick={() => handleAnswer(s)} className="p-3.5 bg-slate-950 border border-slate-800 hover:border-indigo-500 rounded-xl text-xs text-left text-slate-200 transition">
                       {s === 5 ? "매우 그렇다 (Strongly Agree)" : s === 4 ? "그렇다 (Agree)" : s === 3 ? "보통이다 (Neutral)" : s === 2 ? "그렇지 않다 (Disagree)" : "전혀 그렇지 않다 (Strongly Disagree)"}
                     </button>
                   ))}
@@ -181,6 +235,16 @@ export function App() {
                   <span className="px-3 py-1 bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-xs font-bold rounded-full">진단 결과</span>
                   <h1 className="text-2xl font-bold text-white my-2">{result.nameKo}</h1>
                   <p className="text-xs text-slate-300 max-w-md mx-auto">{result.descKo}</p>
+                  <div className="mt-4 text-sm text-slate-200">
+                    <h3 className="font-semibold mb-2">🔎 인사이트</h3>
+                    <p>{result.insightsKo}</p>
+                  </div>
+                  <div className="mt-4 text-sm text-slate-200">
+                    <h3 className="font-semibold mb-2">💡 실천 전략</h3>
+                    <ul className="list-disc list-inside space-y-1">
+                      {result.strategiesKo.map((st: string, idx: number) => (<li key={idx}>{st}</li>))}
+                    </ul>
+                  </div>
                 </div>
 
                 {/* Online Result Share Box */}
@@ -203,7 +267,7 @@ export function App() {
                     className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white"
                   />
                   <button onClick={handleShareResult} className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg text-xs transition">
-                    라이브 피드에 내 진단 결과 등록하기 🚀
+                    내 생산성 비법을 공유하고, 함께 성장하기 🚀
                   </button>
                 </div>
               </div>
@@ -272,47 +336,34 @@ export function App() {
                 </div>
               ))}
             </div>
-          </div>
-        )}
-      </main>
-
-      <footer className="border-t border-slate-800 py-4 text-center text-[10px] text-slate-500">
-        © 2026 micro-break-routine. Live Online Community Connected. Powered by Pomyjo.
-      </footer>
-      {/* SEO 본문 */}
-      <div style={{maxWidth:720,margin:'48px auto 0',padding:'0 24px'}}>
-        <div style={{background:'rgba(255,255,255,.03)',border:'1px solid rgba(255,255,255,.08)',borderRadius:20,padding:32}}>
-          <h3 style={{fontSize:20,fontWeight:800,color:'#fff',margin:'0 0 20px'}}>마이크로 브레이크: 짧은 휴식 루틴 가이드</h3>
-          <div style={{marginBottom:24}}>
-            <h4 style={{color:'#818cf8',fontSize:15,margin:'0 0 8px'}}>📌 짧은 휴식 루틴 이해하기</h4>
-            <p style={{color:'#cbd5e1',fontSize:14,lineHeight:1.8,margin:0}}>마이크로 브레이크은 짧은 휴식 루틴를 과학적으로 측정하는 무료 자가진단 도구입니다. 20개 문항을 통해 당신의 현재 상태를 객관적으로 분석하고, 맞춤형 개선 전략을 제시합니다. 진단은 3-5분이면 완료되며 결과는 즉시 제공됩니다.</p>
-          </div>
-          <div style={{marginBottom:24}}>
-            <h4 style={{color:'#818cf8',fontSize:15,margin:'0 0 8px'}}>📌 생산성 실천 전략</h4>
-            <p style={{color:'#cbd5e1',fontSize:14,lineHeight:1.8,margin:0}}>전문가들이 권장하는 생산성 핵심 원칙을 단계별로 적용해보세요. 작은 습관부터 시작하면 꾸준함을 유지하기 쉽습니다. 매일 10분씩 실천 가능한 루틴을 만들어보세요.</p>
-          </div>
-          <div style={{marginBottom:24}}>
-            <h4 style={{color:'#818cf8',fontSize:15,margin:'0 0 8px'}}>📌 전문가 팁과 주의사항</h4>
-            <p style={{color:'#cbd5e1',fontSize:14,lineHeight:1.8,margin:0}}>짧은 휴식 루틴 관련 연구와 사례를 바탕으로, 당신의 상황에 가장 효과적인 전략을 소개합니다. 결과는 참고용이며, 지속적인 어려움이 있다면 전문가와 상담하세요.</p>
-          </div>
-          <h3 style={{fontSize:17,fontWeight:800,color:'#fff',margin:'0 0 16px'}}>❓ 자주 묻는 질문 (FAQ)</h3>
-          <div style={{marginBottom:14}}>
-            <h4 style={{color:'#e2e8f0',fontSize:14,marginBottom:6}}>마이크로 브레이크 테스트는 정확한가요?</h4>
-            <p style={{color:'#94a3b8',fontSize:13,lineHeight:1.7,margin:0}}>본 테스트는 심리학 연구와 임상 기준을 참고한 자기보고식 선별 도구입니다. 공식 진단을 대체하지 않으며, 참고용으로 활용하세요.</p>
-          </div>
-          <div style={{marginBottom:14}}>
-            <h4 style={{color:'#e2e8f0',fontSize:14,marginBottom:6}}>테스트는 몇 분 정도 걸리나요?</h4>
-            <p style={{color:'#94a3b8',fontSize:13,lineHeight:1.7,margin:0}}>약 3-5분이 소요되며 20개 문항으로 구성됩니다. 결과는 제출 즉시 제공됩니다.</p>
-          </div>
-          <div style={{marginBottom:14}}>
-            <h4 style={{color:'#e2e8f0',fontSize:14,marginBottom:6}}>결과는 어떻게 활용해야 하나요?</h4>
-            <p style={{color:'#94a3b8',fontSize:13,lineHeight:1.7,margin:0}}>결과 페이지의 맞춤 가이드를 실천해보세요. 변화를 기록하면 개선 효과를 더 잘 확인할 수 있습니다.</p>
-          </div>
-          <div style={{marginBottom:14}}>
-            <h4 style={{color:'#e2e8f0',fontSize:14,marginBottom:6}}>내 데이터는 안전한가요?</h4>
-            <p style={{color:'#94a3b8',fontSize:13,lineHeight:1.7,margin:0}}>개인 식별 정보는 수집하지 않으며, 진단 결과는 익명으로 집계되어 서비스 개선에만 사용됩니다.</p>
-          </div>
+          <h3 style={{fontSize:18,fontWeight:800,color:'#fff',marginBottom:16}}>❓ 자주 묻는 질문 (FAQ)</h3>
+          <section style={{marginBottom:16}}>
+            <h4 style={{color:'#e2e8f0',fontSize:15,marginBottom:6}}>마이크로 브레이크 테스트는 얼마나 정확한가요?</h4>
+            <p style={{color:'#94a3b8',fontSize:14,lineHeight:1.7}}>
+              본 도구는 최신 심리학 연구와 임상 기준을 토대로 설계된 자기보고식 선별 검사이며, 공식 진단을 대체하지는 않습니다. 개인화된 인사이트와 실천 전략을 제공하는 보조 도구로 활용해주세요.
+            </p>
+          </section>
+          <section style={{marginBottom:16}}>
+            <h4 style={{color:'#e2e8f0',fontSize:15,marginBottom:6}}>테스트 소요 시간은 얼마나 되나요?</h4>
+            <p style={{color:'#94a3b8',fontSize:14,lineHeight:1.7}}>
+              20개의 문항을 답변하는 데 약 3~5분 정도 소요됩니다. 빠른 응답을 위해 라디오 버튼 대신 클릭형 스케일을 채택했습니다.
+            </p>
+          </section>
+          <section style={{marginBottom:16}}>
+            <h4 style={{color:'#e2e8f0',fontSize:15,marginBottom:6}}>결과를 어떻게 활용하면 좋을까요?</h4>
+            <p style={{color:'#94a3b8',fontSize:14,lineHeight:1.7}}>
+              결과 페이지에 제공되는 맞춤형 실천 전략을 즉시 적용하고, 1주일간 수행 로그를 기록해 변화를 관찰하세요. 필요 시 전략을 조정하거나 커뮤니티 피드에서 다른 사용자 경험을 참고할 수 있습니다.
+            </p>
+          </section>
+          <section style={{marginBottom:16}}>
+            <h4 style={{color:'#e2e8f0',fontSize:15,marginBottom:6}}>내 데이터는 안전한가요?</h4>
+            <p style={{color:'#94a3b8',fontSize:14,lineHeight:1.7}}>
+              개인 식별 정보는 수집하지 않으며, 모든 진단 결과는 익명으로 집계됩니다. 데이터는 서비스 개선과 연구 목적에만 사용되며, 외부에 공유되지 않습니다.
+            </p>
+          </section>
         </div>
+      </div>inBottom:14}}>
+
       </div>
     </div>
   );
