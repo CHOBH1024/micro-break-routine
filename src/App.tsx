@@ -5,7 +5,7 @@ interface ResultShare { id: string; user: string; archetype: string; emoji: stri
 interface Comment { id: string; user: string; text: string; time: string; }
 interface ApiComment { id: number; site: string; result_type: string | null; nickname: string; body: string; created_at: number; }
 
-const API = '/api';
+const API = 'https://api.pomyjo.com/api';
 const SITE = 'micro-break-routine';
 
 function timeAgo(ts: number, isEn: boolean): string {
